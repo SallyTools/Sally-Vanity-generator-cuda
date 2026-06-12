@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="360" viewBox="0 0 1200 360" font-family="'JetBrains Mono','DejaVu Sans Mono',monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0b0f1a"/>
+      <stop offset="1" stop-color="#05070d"/>
+    </linearGradient>
+    <radialGradient id="glowBlue" cx="22%" cy="18%" r="55%">
+      <stop offset="0" stop-color="#0052ff" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#0052ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowYellow" cx="86%" cy="92%" r="55%">
+      <stop offset="0" stop-color="#f0b90b" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#f0b90b" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5b8cff"/>
+      <stop offset="0.55" stop-color="#9fbcff"/>
+      <stop offset="1" stop-color="#f0b90b"/>
+    </linearGradient>
+    <linearGradient id="eth" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b8cff"/>
+      <stop offset="1" stop-color="#f0b90b"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="360" rx="20" fill="url(#bg)"/>
+  <rect width="1200" height="360" rx="20" fill="url(#glowBlue)"/>
+  <rect width="1200" height="360" rx="20" fill="url(#glowYellow)"/>
+  <rect x="1" y="1" width="1198" height="358" rx="20" fill="none" stroke="#ffffff" stroke-opacity="0.10"/>
+
+  <!-- Ethereum diamond, blue/yellow -->
+  <g transform="translate(150 180)" opacity="0.97">
+    <polygon points="0,-92 56,8 0,44 -56,8" fill="url(#eth)" opacity="0.92"/>
+    <polygon points="0,-92 56,8 0,-22" fill="#0052ff" opacity="0.55"/>
+    <polygon points="0,58 56,22 0,96 -56,22" fill="url(#eth)" opacity="0.85"/>
+    <polygon points="0,58 56,22 0,72" fill="#f0b90b" opacity="0.45"/>
+  </g>
+
+  <!-- Title -->
+  <text x="290" y="150" font-size="74" font-weight="700" letter-spacing="1">
+    <tspan fill="#5b8cff">Sally</tspan><tspan fill="#f0b90b"> Vanity</tspan>
+  </text>
+  <text x="292" y="200" font-size="30" font-weight="700" letter-spacing="6" fill="#ffffff" opacity="0.92">ETH ADDRESS GENERATOR</text>
+
+  <!-- Tagline -->
+  <text x="292" y="244" font-size="15.5" fill="#ffffff" opacity="0.6">CUDA secp256k1 · BIP39 seed phrases · CREATE / CREATE2 · GPU &amp; CPU · 100% local &amp; offline</text>
+
+  <!-- Feature chips -->
+  <g font-size="15" font-weight="600">
+    <g transform="translate(292 280)">
+      <rect width="150" height="34" rx="8" fill="#0052ff" fill-opacity="0.16" stroke="#3d7bff" stroke-opacity="0.7"/>
+      <text x="75" y="22" text-anchor="middle" fill="#9fbcff">Raw key · fast</text>
+    </g>
+    <g transform="translate(454 280)">
+      <rect width="168" height="34" rx="8" fill="#f0b90b" fill-opacity="0.14" stroke="#f0b90b" stroke-opacity="0.7"/>
+      <text x="84" y="22" text-anchor="middle" fill="#ffd24a">BIP39 seed · import</text>
+    </g>
+    <g transform="translate(634 280)">
+      <rect width="186" height="34" rx="8" fill="#0052ff" fill-opacity="0.16" stroke="#3d7bff" stroke-opacity="0.7"/>
+      <text x="93" y="22" text-anchor="middle" fill="#9fbcff">SafePal passphrase</text>
+    </g>
+    <g transform="translate(832 280)">
+      <rect width="176" height="34" rx="8" fill="#f0b90b" fill-opacity="0.14" stroke="#f0b90b" stroke-opacity="0.7"/>
+      <text x="88" y="22" text-anchor="middle" fill="#ffd24a">contract vanity</text>
+    </g>
+  </g>
+
+  <!-- Languages -->
+  <text x="1150" y="44" text-anchor="end" font-size="14" letter-spacing="1.5" fill="#ffffff" opacity="0.5">10 languages · EN DE ES FR PT RU 中文 日本語 हिन्दी العربية</text>
+</svg>

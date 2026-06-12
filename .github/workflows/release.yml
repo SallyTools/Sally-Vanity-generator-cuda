@@ -1,0 +1,195 @@
+name: release
+
+# Build portable CPU binaries (and Linux CUDA binaries) for many platforms on a
+# version tag, then publish them as .zip assets on the GitHub Release.
+#
+# Portability note: the crypto core uses 128-bit integer math (`unsigned __int128`),
+# which exists only on 64-bit targets and only on GCC/Clang (not MSVC). Therefore:
+#   * Windows CPU build uses MinGW-w64 g++ (supports __int128), not MSVC cl.
+#   * ARM target is aarch64 (64-bit). 32-bit ARM (armv6/armv7) has no __int128 and
+#     is intentionally NOT shipped — we never publish unverified key-generation code.
+#   * Windows CUDA is not built in CI (nvcc's host compiler on Windows is MSVC).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # softprops/action-gh-release creates/edits the release
+
+jobs:
+  # =========================================================================
+  # 1) Native CPU builds: Linux x86_64, macOS x86_64, macOS arm64
+  # =========================================================================
+  cpu-native:
+    name: cpu ${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, os: linux,  arch: x86_64 }
+          - { runner: macos-13,      os: macos,  arch: x86_64 }
+          - { runner: macos-14,      os: macos,  arch: arm64  }
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build (Linux g++)
+        if: matrix.os == 'linux'
+        run: |
+          g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/vanity.cu   -o vanity-cpu
+          g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/selftest.cu -o selftest-cpu
+
+      - name: Build (macOS clang + libomp)
+        if: matrix.os == 'macos'
+        run: |
+          brew install libomp
+          OMP="$(brew --prefix libomp)"
+          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
+            -x c++ -Isrc src/vanity.cu   -L"$OMP/lib" -lomp -o vanity-cpu
+          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
+            -x c++ -Isrc src/selftest.cu -L"$OMP/lib" -lomp -o selftest-cpu
+
+      - name: Selftest (gate)
+        run: ./selftest-cpu
+
+      - name: Package
+        shell: bash
+        run: |
+          DEST="sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}"
+          mkdir -p "$DEST"
+          cp vanity-cpu selftest-cpu "$DEST"/
+          cp -r gui src "$DEST"/
+          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
+          [ -d assets ] && cp -r assets "$DEST"/ || true
+          if command -v zip >/dev/null; then zip -r "${DEST}.zip" "$DEST";
+          else ditto -c -k --keepParent "$DEST" "${DEST}.zip"; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}
+          path: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}.zip
+          if-no-files-found: error
+
+  # =========================================================================
+  # 2) Windows CPU build via MinGW-w64 g++ (MSVC cl lacks __int128)
+  # =========================================================================
+  cpu-windows:
+    name: cpu windows-x86_64
+    runs-on: windows-latest
+    defaults:
+      run: { shell: 'msys2 {0}' }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: mingw-w64-x86_64-gcc zip
+      - name: Build (MinGW g++, static runtime for a portable .exe)
+        run: |
+          g++ -O3 -std=c++17 -fopenmp -pthread -static -x c++ -Isrc src/vanity.cu   -o vanity-cpu.exe
+          g++ -O3 -std=c++17 -fopenmp -pthread -static -x c++ -Isrc src/selftest.cu -o selftest-cpu.exe
+      - name: Selftest (gate)
+        run: ./selftest-cpu.exe
+      - name: Package
+        run: |
+          DEST="sally-vanity-eth-windows-x86_64"
+          mkdir -p "$DEST"
+          cp vanity-cpu.exe selftest-cpu.exe "$DEST"/
+          cp -r gui src "$DEST"/
+          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
+          [ -d assets ] && cp -r assets "$DEST"/ || true
+          zip -r "${DEST}.zip" "$DEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sally-vanity-eth-windows-x86_64
+          path: sally-vanity-eth-windows-x86_64.zip
+          if-no-files-found: error
+
+  # =========================================================================
+  # 3) Linux aarch64 (64-bit ARM) via emulated container — builds AND runs the
+  #    selftest in-arch, so the ARM binary is correctness-gated too.
+  # =========================================================================
+  cpu-linux-arm64:
+    name: cpu linux-aarch64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: uraimo/run-on-arch-action@v3
+        id: build
+        with:
+          arch: aarch64
+          distro: ubuntu22.04
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update -q
+            apt-get install -y g++ zip
+          run: |
+            g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/vanity.cu   -o vanity-cpu
+            g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/selftest.cu -o selftest-cpu
+            ./selftest-cpu
+            DEST="sally-vanity-eth-linux-aarch64"
+            mkdir -p "$DEST"
+            cp vanity-cpu selftest-cpu "$DEST"/
+            cp -r gui src "$DEST"/
+            cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
+            [ -d assets ] && cp -r assets "$DEST"/ || true
+            zip -r "${DEST}.zip" "$DEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sally-vanity-eth-linux-aarch64
+          path: sally-vanity-eth-linux-aarch64.zip
+          if-no-files-found: error
+
+  # =========================================================================
+  # 4) Linux CUDA (GPU) build — nvcc compiles without a GPU present. The
+  #    host-only selftest still runs and gates correctness.
+  # =========================================================================
+  cuda-linux:
+    name: cuda linux-x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: "12.6.2"
+          method: network
+      - name: Build (nvcc)
+        run: make all
+      - name: Selftest (host-only, gate)
+        run: ./selftest
+      - name: Package
+        shell: bash
+        run: |
+          DEST="sally-vanity-eth-linux-x86_64-cuda"
+          mkdir -p "$DEST"
+          cp vanity selftest "$DEST"/
+          cp -r gui src "$DEST"/
+          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
+          [ -d assets ] && cp -r assets "$DEST"/ || true
+          zip -r "${DEST}.zip" "$DEST"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sally-vanity-eth-linux-x86_64-cuda
+          path: sally-vanity-eth-linux-x86_64-cuda.zip
+          if-no-files-found: error
+
+  # =========================================================================
+  # 5) Publish: gather all zips and attach to the GitHub Release
+  # =========================================================================
+  release:
+    name: publish release
+    needs: [cpu-native, cpu-windows, cpu-linux-arm64, cuda-linux]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { path: dist, merge-multiple: true }
+      - name: List assets
+        run: ls -la dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+          generate_release_notes: true
+          fail_on_unmatched_files: false

@@ -1,0 +1,32 @@
+# Build artifacts (rebuild with `make` / `make cpu`)
+/vanity
+/vanity-cpu
+/selftest
+/selftest-cpu
+*.o
+*.obj
+*.exe
+*.out
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Release staging (produced by CI / packaging)
+dist/
+sally-vanity-eth-*/
+sally-vanity-eth-*.zip
+
+# Secrets / local config — NEVER commit
+.env
+.env.*
+*.token
+
+# Session / editor / OS
+.claude/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
