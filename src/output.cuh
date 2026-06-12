@@ -66,9 +66,11 @@ static void print_match(int target){
     printf("\n=== MATCH ===\n");
     if(words[0]){
         printf("mnemonic    : %s\n", words);
-        if(hseed.passlen) printf("passphrase  : (set, %d chars) — vanity gilt NUR mit dieser Passphrase\n", hseed.passlen);
+        if(hseed.passlen) printf("passphrase  : %.*s\n", hseed.passlen, hseed.pass);
         printf("path        : m/44'/60'/0'/0/0\n");
     }
+    // address + private key below are for the REAL vanity wallet (derived WITH the
+    // passphrase if one is set) — save mnemonic + passphrase + private key together.
     printf("address     : 0x%s\n", eaddr);
     if(target!=TGT_EOA){
         char fstr[41]; to_eip55(fin,fstr);

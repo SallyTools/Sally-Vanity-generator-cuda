@@ -3,7 +3,7 @@
 # No browser, no HTTP server: a frameless Qt window in a fixed mixed Base-blue /
 # Binance-yellow design, with a built-in language switch (EN / 中文 / हिन्दी / ES).
 # Drives ./vanity (GPU) or ./vanity-cpu (CPU) via QProcess.
-import os, re, sys, math, shutil, shlex
+import os, re, sys, math, shutil, shlex, time
 try: import psutil
 except Exception: psutil = None
 from PySide6.QtCore import Qt, QProcess, QRegularExpression, QSize, QTimer
@@ -18,6 +18,14 @@ ASSETS = os.path.join(ROOT, "assets")
 def asset(name): return os.path.join(ASSETS, name)
 BIN_GPU = os.path.join(ROOT, "vanity")
 BIN_CPU = os.path.join(ROOT, "vanity-cpu")
+
+def gpu_build_present():
+    """True if a CUDA (GPU) binary was actually built/shipped next to us. We do NOT
+    assume per-OS — we detect the real artifact. nvcc only ever produces ./vanity on
+    a machine with the CUDA Toolkit, so its presence is the honest capability signal.
+    On macOS this is always False (Apple has no NVIDIA GPU and CUDA has no macOS
+    target — the last macOS CUDA was 10.2/2019, x86-only, never on Apple Silicon)."""
+    return os.path.exists(BIN_GPU) or os.path.exists(BIN_GPU + ".exe")
 
 # label for the "enable GPU" elevation button (shown after a GPU-permission fallback)
 ENABLE_GPU_TXT = {
@@ -71,16 +79,17 @@ I18N = {
  "nonce":"Deploy nonce (CREATE; 0 = first contract)",
  "ncount":"Check nonces (count from start nonce; 1 = only this, e.g. 2 = nonce 0 or 1)",
  "salt":"Salt (CREATE2, 32-byte hex) — optional","initcode":"Init code (CREATE2, hex) — optional",
- "sec_perf":"GPU PERFORMANCE & PROTECTION",
+ "sec_perf":"GPU PERFORMANCE & PROTECTION","sec_cpu":"CPU THREADS","cpu_threads":"threads",
  "gpu_hint":"Caps GPU usage via duty cycle → short kernel bursts keep the desktop responsive. Recommended ≤ 80% (single GPU).",
  "start":"Start search","stop":"Stop","speed":"SPEED","tried":"TRIED","burst":"BURST","eta":"ETA",
  "gpu_max":"GPU max","difficulty":"Difficulty","avgtime":"Avg. time",
  "seed_note":"Seed mode: ~100 k/s, ≤6–7 chars recommended",
- "res_found":"✓ MATCH FOUND","res_mnemonic":"MNEMONIC (12/24 words)","res_contract":"CONTRACT ADDRESS",
+ "res_found":"✓ MATCH FOUND","res_mnemonic":"MNEMONIC (12/24 words)","res_passphrase":"PASSPHRASE (save with the mnemonic)","res_contract":"CONTRACT ADDRESS",
  "res_address":"ADDRESS","res_privkey":"PRIVATE KEY","show":"show","hide":"hide",
  "warn":"⚠ Keep the private key / mnemonic secret — whoever holds it fully controls the address.",
  "foot":"Sally Vanity ETH Generator · local & offline",
  "err_pattern":"Specify a prefix or suffix.","err_binary":"Binary missing ({name}) — run the installer / `make` first.","years":"years",
+ "no_gpu_build":"No CUDA binary in this build (./vanity) — e.g. macOS has no CUDA/NVIDIA support. CPU only.",
 },
 "es": {
  "sub":"generador vanity secp256k1 · raw key · BIP39 seed · CREATE/CREATE2 · GPU/CPU",
@@ -161,6 +170,7 @@ I18N = {
  "warn":"⚠ Private Key / Mnemonic geheim halten — wer sie besitzt, kontrolliert die Adresse vollständig.",
  "foot":"Sally Vanity ETH Generator · lokal & offline",
  "err_pattern":"Prefix oder Suffix angeben.","err_binary":"Binary fehlt ({name}) — erst Installer / `make` ausführen.","years":"Jahre",
+ "no_gpu_build":"Kein CUDA-Binary in diesem Build (./vanity) — z. B. macOS hat keine CUDA/NVIDIA-Unterstützung. Nur CPU.",
 },
 "fr": {
  "sub":"générateur d'adresses vanity secp256k1 · raw key · BIP39 seed · CREATE/CREATE2 · GPU/CPU",
@@ -270,6 +280,7 @@ BURST = re.compile(r"burst=([\d.]+)ms")
 ADDR = re.compile(r"address\s*:\s*0x([0-9a-fA-FxX]{40})")
 KEY  = re.compile(r"private key\s*:\s*0x([0-9a-fA-F]{64})")
 MNE  = re.compile(r"mnemonic\s*:\s*(.+)")
+PASS = re.compile(r"passphrase\s*:\s*(.+)")
 CON  = re.compile(r"contract\s*:\s*0x([0-9a-fA-FxX]{40})")
 
 QSS = f"""
@@ -387,7 +398,8 @@ class App(QWidget):
         top.addWidget(self.langbox); top.addSpacing(8)
         self.dot = QLabel("●"); self.dot.setStyleSheet("color:rgba(255,255,255,70); font-size:11px")
         self.stext = QLabel(); self.stext.setObjectName("stext")
-        top.addWidget(self.dot); top.addSpacing(5); top.addWidget(self.stext); top.addSpacing(12)
+        self.runtime = QLabel(""); self.runtime.setObjectName("stext")
+        top.addWidget(self.dot); top.addSpacing(5); top.addWidget(self.stext); top.addSpacing(6); top.addWidget(self.runtime); top.addSpacing(12)
         # top-right app logo
         self.logo = QLabel(); self.logo.setFixedSize(20,20)
         _lp = QPixmap(asset("icon-64.png"))
@@ -417,6 +429,14 @@ class App(QWidget):
         self.src = self._segment(c, "source",  ["Raw Key","Seed 12","Seed 24"], 0, self._mode_changed)
         self.tgt = self._segment(c, "target",  ["Wallet","CREATE","CREATE2"], 0, self._mode_changed)
         self.bk  = self._segment(c, "backend", ["GPU","CPU","GPU+CPU"], 0, self._mode_changed)
+        if not gpu_build_present():
+            # No CUDA binary present (CPU-only download, or macOS — Apple has no CUDA).
+            # Detected, not assumed: if a ./vanity GPU build ever appears, these light up.
+            for _i in (0, 2):
+                b = self.bk.button(_i)
+                b.setEnabled(False); b.setChecked(False)
+                b.setToolTip(self.T("no_gpu_build"))
+            self.bk.button(1).setChecked(True)
         c.addSpacing(6)
         self.passphrase, self.pp_wrap_box = self._labeled_input("passphrase", "", False)
         self.nonce, self.nonce_box = self._labeled_input("nonce", "0", True)
@@ -436,6 +456,17 @@ class App(QWidget):
         srow.addWidget(self.slider); srow.addWidget(self.utilv); c.addLayout(srow); c.addSpacing(8)
         self.hint = QLabel(); self.hint.setObjectName("hint"); self.hint.setWordWrap(True); c.addWidget(self.hint); c.addSpacing(16)
         self._reg(lambda: self.hint.setText(self.T("gpu_hint")))
+        # ---- CPU threads (shown for CPU / Hybrid backends) ----
+        self._cpus = max(1, os.cpu_count() or 1)
+        self.cpu_label = QLabel(); self.cpu_label.setProperty("class","label"); self.cpu_label.setTextFormat(Qt.RichText)
+        self._reg(lambda: self.cpu_label.setText(f"<span style='color:{YELLOW}'>⚙</span>  "+self.T("sec_cpu")))
+        c.addWidget(self.cpu_label); c.addSpacing(8)
+        crow = QHBoxLayout()
+        self.cpu_slider = QSlider(Qt.Horizontal); self.cpu_slider.setRange(1,self._cpus); self.cpu_slider.setValue(self._cpus)
+        self.cpu_slider.valueChanged.connect(self._recalc_cpu)
+        self.cpu_val = QLabel(); self.cpu_val.setObjectName("diff"); self.cpu_val.setMinimumWidth(120); self.cpu_val.setAlignment(Qt.AlignRight)
+        crow.addWidget(self.cpu_slider); crow.addWidget(self.cpu_val); c.addLayout(crow); c.addSpacing(16)
+        self._reg(self._recalc_cpu)
 
         # ---- buttons ----
         brow = QHBoxLayout(); brow.setSpacing(12)
@@ -468,6 +499,9 @@ class App(QWidget):
         self.mne_k = QLabel(); self.mne_k.setObjectName("rk"); self.mne_k.setVisible(False); r.addWidget(self.mne_k)
         self._reg(lambda: self.mne_k.setText(self.T("res_mnemonic")))
         self.mne, mwrap = self._monoline("mne"); self.mne_wrap = mwrap; mwrap.setVisible(False); r.addWidget(mwrap)
+        self.pass_k = QLabel(); self.pass_k.setObjectName("rk"); self.pass_k.setVisible(False); r.addWidget(self.pass_k)
+        self._reg(lambda: self.pass_k.setText(self.T("res_passphrase")))
+        self.passout, pwrap2 = self._monoline("mne"); self.pass_wrap = pwrap2; pwrap2.setVisible(False); r.addWidget(pwrap2)
         self.con_k = QLabel(); self.con_k.setObjectName("rk"); self.con_k.setVisible(False); r.addWidget(self.con_k)
         self._reg(lambda: self.con_k.setText(self.T("res_contract")))
         self.con, cwrap = self._monoline("con"); self.con_wrap = cwrap; cwrap.setVisible(False); r.addWidget(cwrap)
@@ -496,6 +530,9 @@ class App(QWidget):
 
         self.setStyleSheet(QSS)
         self.prefix.textChanged.connect(self._recalc); self.suffix.textChanged.connect(self._recalc)
+        # live elapsed-time ticker (created BEFORE retranslate, which calls _set_running)
+        self._t_start = 0.0
+        self._run_timer = QTimer(self); self._run_timer.timeout.connect(self._tick_elapsed)
         self.retranslate(); self._mode_changed(); self._recalc()
         # live GPU/CPU temperature poller (non-blocking)
         self._tproc = None
@@ -580,14 +617,18 @@ class App(QWidget):
         if self.live_rate > 0: return self.live_rate
         if self._is_seed(): return 0.10
         return BASE_RATE * (self.slider.value()/100.0 if self.bk.checkedId() in (0,2) else 0.01)
+    def _recalc_cpu(self):
+        self.cpu_val.setText(f"{self.T('cpu_threads')} <b>{self.cpu_slider.value()}</b> / {self._cpus}")
     def _mode_changed(self):
-        seed = self._is_seed(); tgt = self.tgt.checkedId(); gpu = self.bk.checkedId() in (0,2)
+        seed = self._is_seed(); tgt = self.tgt.checkedId(); bkid = self.bk.checkedId()
+        gpu = bkid in (0,2); cpu = bkid in (1,2)
         self.pp_wrap_box.itemAt(0).widget().setVisible(seed); self.passphrase.parentWidget().setVisible(seed)
         self.nonce_box.itemAt(0).widget().setVisible(tgt==1); self.nonce.parentWidget().setVisible(tgt==1)
         self.ncount_box.itemAt(0).widget().setVisible(tgt==1); self.ncount.parentWidget().setVisible(tgt==1)
         for box,w in ((self.salt_box,self.salt),(self.init_box,self.init)):
             box.itemAt(0).widget().setVisible(tgt==2); w.parentWidget().setVisible(tgt==2)
         self.perf_label.setVisible(gpu); self.slider.setVisible(gpu); self.utilv.setVisible(gpu); self.hint.setVisible(gpu)
+        self.cpu_label.setVisible(cpu); self.cpu_slider.setVisible(cpu); self.cpu_val.setVisible(cpu)
         self.adjustSize(); self._recalc()
     def _recalc(self):
         self.utilv.setText(f"{self.T('gpu_max')} <b>{self.slider.value()}</b>%")
@@ -597,12 +638,17 @@ class App(QWidget):
         t = (16.0**n) / (self._rate_est()*1e6)
         note = "  ·  "+self.T("seed_note") if self._is_seed() else ""
         self.diff.setText(f"{self.T('difficulty')} <b>16^{n}</b>     {self.T('avgtime')} <b>~{self._fmt(t)}</b>{note}")
+    def _tick_elapsed(self):
+        if self._t_start>0:
+            el=int(time.monotonic()-self._t_start); self.runtime.setText(f"· {el//60}:{el%60:02d}")
     def _set_running(self, running, found=False):
         self._running = running; self._found = found
         self.start.setEnabled(not running); self.stopb.setEnabled(running)
         if found:   self.dot.setStyleSheet(f"color:{YELLOW}; font-size:11px"); self.stext.setText(self.T("st_found"))
         elif running: self.dot.setStyleSheet(f"color:{BLUE}; font-size:11px"); self.stext.setText(self.T("st_search"))
         else:       self.dot.setStyleSheet("color:rgba(255,255,255,70); font-size:11px"); self.stext.setText(self.T("st_idle"))
+        if running: self._t_start=time.monotonic(); self.runtime.setText("· 0:00"); self._run_timer.start(1000)
+        else: self._run_timer.stop()
     def _toggle_key(self):
         if self.key.echoMode() == QLineEdit.Password: self.key.setEchoMode(QLineEdit.Normal); self.revealb.setText(f"[{self.T('hide')}]")
         else: self.key.setEchoMode(QLineEdit.Password); self.revealb.setText(f"[{self.T('show')}]")
@@ -650,6 +696,8 @@ class App(QWidget):
         if bkid==2:   args += ["--hybrid", "--gpu-util", str(self.slider.value())]
         elif bkid==0: args += ["--gpu-util", str(self.slider.value())]
         else:         args += ["--cpu"]
+        if bkid in (1,2) and self.cpu_slider.value() < self._cpus:
+            args += ["--threads", str(self.cpu_slider.value())]
         if pre: args += ["--prefix", pre]
         if suf: args += ["--suffix", suf]
         if self._is_seed() and self.passphrase.text(): args += ["--passphrase", self.passphrase.text()]
@@ -665,6 +713,8 @@ class App(QWidget):
 
     def on_start(self, elevated=False):
         self.err.setText(""); self.result.setVisible(False); self.elevate.setVisible(False)
+        for w in (self.mne_wrap,self.mne_k,self.pass_wrap,self.pass_k,self.con_wrap,self.con_k):
+            w.setVisible(False)                          # reset conditional result rows
         built, errmsg = self._build_args()
         if errmsg: self.err.setText(errmsg); return
         binp, args = built
@@ -704,6 +754,9 @@ class App(QWidget):
             mn = MNE.search(line)
             if mn:
                 self.mne.setText(mn.group(1).strip()); self.mne_wrap.setVisible(True); self.mne_k.setVisible(True)
+            pw = PASS.search(line)
+            if pw:
+                self.passout.setText(pw.group(1).strip()); self.pass_wrap.setVisible(True); self.pass_k.setVisible(True)
             con = CON.search(line)
             if con:
                 self.con.setText("0x"+con.group(1)); self.con_wrap.setVisible(True); self.con_k.setVisible(True)

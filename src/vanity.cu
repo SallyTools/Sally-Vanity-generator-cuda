@@ -37,7 +37,7 @@ int main(int argc,char**argv){
     [[maybe_unused]] int half=512, blocks=60, tpb=128, itersPerLaunch=1;
     [[maybe_unused]] long maxLaunches=1L<<60;
     [[maybe_unused]] int gpuUtil=80; [[maybe_unused]] double targetMs=20.0;
-    int useCpu=0; [[maybe_unused]] int hybrid=0;
+    int useCpu=0; [[maybe_unused]] int hybrid=0; int threads=0;   // threads=0 → all cores
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--prefix")&&i+1<argc) pref=argv[++i];
         else if(!strcmp(argv[i],"--suffix")&&i+1<argc) suf=argv[++i];
@@ -52,6 +52,7 @@ int main(int argc,char**argv){
         else if(!strcmp(argv[i],"--cpu")) useCpu=1;
         else if(!strcmp(argv[i],"--gpu")) useCpu=0;
         else if(!strcmp(argv[i],"--hybrid")) hybrid=1;
+        else if(!strcmp(argv[i],"--threads")&&i+1<argc) threads=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--half")&&i+1<argc) half=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--blocks")&&i+1<argc) blocks=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--tpb")&&i+1<argc) tpb=atoi(argv[++i]);
@@ -112,6 +113,9 @@ int main(int argc,char**argv){
         fprintf(stderr,"[warn] seed mode at %d chars is slow (~%.0e tries); consider <=6 chars\n",preflen+suflen,diff);
 
     g_res.found=0; g_found.store(0); g_tried.store(0);
+#ifdef _OPENMP
+    if(threads>0) omp_set_num_threads(threads);   // --threads caps CPU worker count
+#endif
 
 #if defined(__CUDACC__)
     // Probe the GPU. Crucially this also catches the "GPU present but no access
