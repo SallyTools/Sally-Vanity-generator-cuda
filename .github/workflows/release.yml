@@ -63,7 +63,7 @@ jobs:
           if command -v zip >/dev/null; then zip -r "${DEST}.zip" "$DEST";
           else ditto -c -k --keepParent "$DEST" "${DEST}.zip"; fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}
           path: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}.zip
@@ -99,7 +99,7 @@ jobs:
           cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
           [ -d assets ] && cp -r assets "$DEST"/ || true
           zip -r "${DEST}.zip" "$DEST"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sally-vanity-eth-windows-x86_64
           path: sally-vanity-eth-windows-x86_64.zip
@@ -136,7 +136,7 @@ jobs:
           cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
           [ -d assets ] && cp -r assets "$DEST"/ || true
           zip -r "${DEST}.zip" "$DEST"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sally-vanity-eth-linux-x86_64-cuda
           path: sally-vanity-eth-linux-x86_64-cuda.zip
@@ -151,7 +151,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { path: dist, merge-multiple: true }
       - name: List assets
         run: ls -la dist
