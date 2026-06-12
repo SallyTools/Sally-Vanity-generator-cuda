@@ -27,6 +27,30 @@ def gpu_build_present():
     target — the last macOS CUDA was 10.2/2019, x86-only, never on Apple Silicon)."""
     return os.path.exists(BIN_GPU) or os.path.exists(BIN_GPU + ".exe")
 
+def nvidia_device_present():
+    """Best-effort, non-blocking: is an NVIDIA GPU visible to the OS right now?
+    True / False / None(unknown — don't penalize). On Linux the live driver exposes
+    /dev/nvidia0.. (instant to stat, no subprocess); on Windows we take the presence
+    of nvidia-smi as a weak yes; elsewhere we stay agnostic and let the runtime decide."""
+    if sys.platform.startswith("linux"):
+        return any(os.path.exists("/dev/nvidia%d" % i) for i in range(8))
+    if sys.platform == "win32":
+        return True if (shutil.which("nvidia-smi") or shutil.which("nvidia-smi.exe")) else None
+    return None
+
+def gpu_status():
+    """Diagnose GPU availability for the UI. Returns (ok, reason_key).
+      ok=True  -> a CUDA binary exists AND an NVIDIA device looks present. The runtime
+                  still has the final say: a permission failure falls back to CPU and
+                  surfaces the ⚡ Enable-GPU button.
+      ok=False -> reason_key ('no_gpu_build' | 'gpu_no_device') explains exactly why,
+                  shown visibly under the backend selector (not just a tooltip)."""
+    if not gpu_build_present():
+        return (False, "no_gpu_build")
+    if nvidia_device_present() is False:
+        return (False, "gpu_no_device")
+    return (True, "")
+
 # label for the "enable GPU" elevation button (shown after a GPU-permission fallback)
 ENABLE_GPU_TXT = {
  "en":"Enable GPU (admin)","de":"GPU aktivieren (Admin)","es":"Activar GPU (admin)",
@@ -89,7 +113,7 @@ I18N = {
  "warn":"⚠ Keep the private key / mnemonic secret — whoever holds it fully controls the address.",
  "foot":"Sally Vanity ETH Generator · local & offline",
  "err_pattern":"Specify a prefix or suffix.","err_binary":"Binary missing ({name}) — run the installer / `make` first.","years":"years",
- "no_gpu_build":"No CUDA binary in this build (./vanity) — e.g. macOS has no CUDA/NVIDIA support. CPU only.",
+ "no_gpu_build":"No CUDA binary in this build (./vanity) — e.g. macOS has no CUDA/NVIDIA support. CPU only.","gpu_no_device":"GPU off — no NVIDIA GPU or driver detected on this machine. Using CPU.",
 },
 "es": {
  "sub":"generador vanity secp256k1 · raw key · BIP39 seed · CREATE/CREATE2 · GPU/CPU",
@@ -100,7 +124,7 @@ I18N = {
  "nonce":"Nonce de despliegue (CREATE; 0 = primer contrato)",
  "ncount":"Comprobar nonces (cuenta desde el nonce inicial; 1 = solo este, p. ej. 2 = nonce 0 o 1)",
  "salt":"Salt (CREATE2, hex de 32 bytes) — opcional","initcode":"Init code (CREATE2, hex) — opcional",
- "sec_perf":"RENDIMIENTO Y PROTECCIÓN DE GPU","res_passphrase":"FRASE DE CONTRASEÑA (guardar con el mnemónico)","sec_cpu":"HILOS DE CPU","cpu_threads":"hilos","no_gpu_build":"Sin binario CUDA en esta compilación (./vanity) — p. ej. macOS no tiene soporte CUDA/NVIDIA. Solo CPU.",
+ "sec_perf":"RENDIMIENTO Y PROTECCIÓN DE GPU","res_passphrase":"FRASE DE CONTRASEÑA (guardar con el mnemónico)","sec_cpu":"HILOS DE CPU","cpu_threads":"hilos","no_gpu_build":"Sin binario CUDA en esta compilación (./vanity) — p. ej. macOS no tiene soporte CUDA/NVIDIA. Solo CPU.","gpu_no_device":"GPU desactivada — no se detectó ninguna GPU/driver NVIDIA en este equipo. Usando CPU.",
  "gpu_hint":"Limita el uso de GPU mediante ciclo de trabajo → ráfagas cortas de kernel mantienen el escritorio fluido. Recomendado ≤ 80% (GPU única).",
  "start":"Iniciar búsqueda","stop":"Detener","speed":"VELOCIDAD","tried":"PROBADOS","burst":"RÁFAGA","eta":"ETA",
  "gpu_max":"GPU máx","difficulty":"Dificultad","avgtime":"Tiempo medio",
@@ -120,7 +144,7 @@ I18N = {
  "nonce":"部署 nonce (CREATE; 0 = 第一个合约)",
  "ncount":"检查 nonce 数量 (从起始 nonce 计数; 1 = 仅此一个，例如 2 = nonce 0 或 1)",
  "salt":"Salt (CREATE2, 32 字节 hex) — 可选","initcode":"初始化代码 (CREATE2, hex) — 可选",
- "sec_perf":"GPU 性能与保护","res_passphrase":"密码短语（与助记词一起保存）","sec_cpu":"CPU 线程","cpu_threads":"线程","no_gpu_build":"此版本无 CUDA 二进制（./vanity）— 例如 macOS 不支持 CUDA/NVIDIA。仅 CPU。",
+ "sec_perf":"GPU 性能与保护","res_passphrase":"密码短语（与助记词一起保存）","sec_cpu":"CPU 线程","cpu_threads":"线程","no_gpu_build":"此版本无 CUDA 二进制（./vanity）— 例如 macOS 不支持 CUDA/NVIDIA。仅 CPU。","gpu_no_device":"GPU 已关闭 — 本机未检测到 NVIDIA GPU 或驱动。使用 CPU。",
  "gpu_hint":"通过占空比限制 GPU 占用 → 短内核突发让桌面保持响应。推荐 ≤ 80%（单 GPU）。",
  "start":"开始搜索","stop":"停止","speed":"速度","tried":"已尝试","burst":"突发","eta":"预计剩余",
  "gpu_max":"GPU 上限","difficulty":"难度","avgtime":"平均耗时",
@@ -140,7 +164,7 @@ I18N = {
  "nonce":"Deploy nonce (CREATE; 0 = पहला कॉन्ट्रैक्ट)",
  "ncount":"nonce जांचें (start nonce से गिनती; 1 = केवल यही, उदा. 2 = nonce 0 या 1)",
  "salt":"Salt (CREATE2, 32-byte hex) — वैकल्पिक","initcode":"Init code (CREATE2, hex) — वैकल्पिक",
- "sec_perf":"GPU प्रदर्शन और सुरक्षा","res_passphrase":"PASSPHRASE (mnemonic के साथ सहेजें)","sec_cpu":"CPU थ्रेड्स","cpu_threads":"थ्रेड्स","no_gpu_build":"इस build में CUDA बाइनरी (./vanity) नहीं — जैसे macOS में CUDA/NVIDIA समर्थन नहीं। केवल CPU।",
+ "sec_perf":"GPU प्रदर्शन और सुरक्षा","res_passphrase":"PASSPHRASE (mnemonic के साथ सहेजें)","sec_cpu":"CPU थ्रेड्स","cpu_threads":"थ्रेड्स","no_gpu_build":"इस build में CUDA बाइनरी (./vanity) नहीं — जैसे macOS में CUDA/NVIDIA समर्थन नहीं। केवल CPU।","gpu_no_device":"GPU बंद — इस मशीन पर कोई NVIDIA GPU या ड्राइवर नहीं मिला। CPU उपयोग हो रहा है।",
  "gpu_hint":"duty cycle के जरिए GPU उपयोग सीमित करता है → छोटे kernel बर्स्ट डेस्कटॉप को रिस्पॉन्सिव रखते हैं। अनुशंसित ≤ 80% (एकल GPU)।",
  "start":"खोज शुरू करें","stop":"रोकें","speed":"गति","tried":"आज़माए गए","burst":"बर्स्ट","eta":"ETA",
  "gpu_max":"GPU अधिकतम","difficulty":"कठिनाई","avgtime":"औसत समय",
@@ -170,7 +194,7 @@ I18N = {
  "warn":"⚠ Private Key / Mnemonic geheim halten — wer sie besitzt, kontrolliert die Adresse vollständig.",
  "foot":"Sally Vanity ETH Generator · lokal & offline",
  "err_pattern":"Prefix oder Suffix angeben.","err_binary":"Binary fehlt ({name}) — erst Installer / `make` ausführen.","years":"Jahre",
- "no_gpu_build":"Kein CUDA-Binary in diesem Build (./vanity) — z. B. macOS hat keine CUDA/NVIDIA-Unterstützung. Nur CPU.",
+ "no_gpu_build":"Kein CUDA-Binary in diesem Build (./vanity) — z. B. macOS hat keine CUDA/NVIDIA-Unterstützung. Nur CPU.","gpu_no_device":"GPU aus — keine NVIDIA-GPU bzw. kein Treiber auf diesem Rechner erkannt. Nutze CPU.",
 },
 "fr": {
  "sub":"générateur d'adresses vanity secp256k1 · raw key · BIP39 seed · CREATE/CREATE2 · GPU/CPU",
@@ -181,7 +205,7 @@ I18N = {
  "nonce":"Nonce de déploiement (CREATE ; 0 = premier contrat)",
  "ncount":"Vérifier les nonces (nombre à partir du nonce de départ ; 1 = celui-ci uniquement, p. ex. 2 = nonce 0 ou 1)",
  "salt":"Salt (CREATE2, hex 32 octets) — optionnel","initcode":"Code d'initialisation (CREATE2, hex) — optionnel",
- "sec_perf":"PERFORMANCE & PROTECTION GPU","res_passphrase":"PHRASE SECRÈTE (à sauvegarder avec la mnémonique)","sec_cpu":"THREADS CPU","cpu_threads":"threads","no_gpu_build":"Aucun binaire CUDA dans cette build (./vanity) — p. ex. macOS n'a pas de support CUDA/NVIDIA. CPU uniquement.",
+ "sec_perf":"PERFORMANCE & PROTECTION GPU","res_passphrase":"PHRASE SECRÈTE (à sauvegarder avec la mnémonique)","sec_cpu":"THREADS CPU","cpu_threads":"threads","no_gpu_build":"Aucun binaire CUDA dans cette build (./vanity) — p. ex. macOS n'a pas de support CUDA/NVIDIA. CPU uniquement.","gpu_no_device":"GPU désactivé — aucun GPU ni pilote NVIDIA détecté sur cette machine. CPU utilisé.",
  "gpu_hint":"Limite l'utilisation du GPU via un cycle de service → de courtes salves de kernel gardent le bureau réactif. Recommandé ≤ 80 % (GPU unique).",
  "start":"Lancer la recherche","stop":"Arrêter","speed":"VITESSE","tried":"ESSAYÉS","burst":"SALVE","eta":"ETA",
  "gpu_max":"GPU max","difficulty":"Difficulté","avgtime":"Temps moyen",
@@ -201,7 +225,7 @@ I18N = {
  "nonce":"Nonce de deploy (CREATE; 0 = primeiro contrato)",
  "ncount":"Verificar nonces (contagem a partir do nonce inicial; 1 = apenas este, ex.: 2 = nonce 0 ou 1)",
  "salt":"Salt (CREATE2, hex de 32 bytes) — opcional","initcode":"Init code (CREATE2, hex) — opcional",
- "sec_perf":"DESEMPENHO E PROTEÇÃO DA GPU","res_passphrase":"SENHA (salvar com a frase mnemônica)","sec_cpu":"THREADS DA CPU","cpu_threads":"threads","no_gpu_build":"Sem binário CUDA nesta build (./vanity) — ex.: macOS não tem suporte CUDA/NVIDIA. Apenas CPU.",
+ "sec_perf":"DESEMPENHO E PROTEÇÃO DA GPU","res_passphrase":"SENHA (salvar com a frase mnemônica)","sec_cpu":"THREADS DA CPU","cpu_threads":"threads","no_gpu_build":"Sem binário CUDA nesta build (./vanity) — ex.: macOS não tem suporte CUDA/NVIDIA. Apenas CPU.","gpu_no_device":"GPU desativada — nenhuma GPU ou driver NVIDIA detectada nesta máquina. Usando CPU.",
  "gpu_hint":"Limita o uso da GPU via ciclo de trabalho → rajadas curtas de kernel mantêm a área de trabalho responsiva. Recomendado ≤ 80% (GPU única).",
  "start":"Iniciar busca","stop":"Parar","speed":"VELOCIDADE","tried":"TENTADOS","burst":"RAJADA","eta":"ETA",
  "gpu_max":"GPU máx.","difficulty":"Dificuldade","avgtime":"Tempo médio",
@@ -221,7 +245,7 @@ I18N = {
  "nonce":"Nonce деплоя (CREATE; 0 = первый контракт)",
  "ncount":"Проверять nonce (количество от начального nonce; 1 = только этот, напр. 2 = nonce 0 или 1)",
  "salt":"Salt (CREATE2, 32-байтный hex) — опционально","initcode":"Init code (CREATE2, hex) — опционально",
- "sec_perf":"ПРОИЗВОДИТЕЛЬНОСТЬ И ЗАЩИТА GPU","res_passphrase":"ПАРОЛЬНАЯ ФРАЗА (хранить с мнемоникой)","sec_cpu":"ПОТОКИ CPU","cpu_threads":"потоки","no_gpu_build":"В этой сборке нет CUDA-бинарника (./vanity) — напр. macOS не поддерживает CUDA/NVIDIA. Только CPU.",
+ "sec_perf":"ПРОИЗВОДИТЕЛЬНОСТЬ И ЗАЩИТА GPU","res_passphrase":"ПАРОЛЬНАЯ ФРАЗА (хранить с мнемоникой)","sec_cpu":"ПОТОКИ CPU","cpu_threads":"потоки","no_gpu_build":"В этой сборке нет CUDA-бинарника (./vanity) — напр. macOS не поддерживает CUDA/NVIDIA. Только CPU.","gpu_no_device":"GPU выключен — на этой машине не обнаружены NVIDIA GPU или драйвер. Используется CPU.",
  "gpu_hint":"Ограничивает использование GPU через рабочий цикл → короткие всплески ядра сохраняют отзывчивость системы. Рекомендуется ≤ 80% (один GPU).",
  "start":"Начать поиск","stop":"Стоп","speed":"СКОРОСТЬ","tried":"ПРОВЕРЕНО","burst":"ВСПЛЕСК","eta":"ETA",
  "gpu_max":"Макс. GPU","difficulty":"Сложность","avgtime":"Ср. время",
@@ -241,7 +265,7 @@ I18N = {
  "nonce":"デプロイ nonce (CREATE; 0 = 最初のコントラクト)",
  "ncount":"nonce 確認数 (開始 nonce からの数; 1 = これのみ、例: 2 = nonce 0 または 1)",
  "salt":"ソルト (CREATE2, 32バイト hex) — 任意","initcode":"Init コード (CREATE2, hex) — 任意",
- "sec_perf":"GPU パフォーマンス & 保護","res_passphrase":"パスフレーズ（ニーモニックと一緒に保存）","sec_cpu":"CPU スレッド","cpu_threads":"スレッド","no_gpu_build":"このビルドに CUDA バイナリ（./vanity）はありません — 例: macOS は CUDA/NVIDIA 非対応。CPU のみ。",
+ "sec_perf":"GPU パフォーマンス & 保護","res_passphrase":"パスフレーズ（ニーモニックと一緒に保存）","sec_cpu":"CPU スレッド","cpu_threads":"スレッド","no_gpu_build":"このビルドに CUDA バイナリ（./vanity）はありません — 例: macOS は CUDA/NVIDIA 非対応。CPU のみ。","gpu_no_device":"GPU オフ — このマシンで NVIDIA GPU またはドライバーが検出されません。CPU を使用します。",
  "gpu_hint":"デューティサイクルで GPU 使用率を制限 → 短いカーネルバーストでデスクトップの応答性を維持。推奨 ≤ 80% (単一 GPU)。",
  "start":"検索開始","stop":"停止","speed":"速度","tried":"試行回数","burst":"バースト","eta":"ETA",
  "gpu_max":"GPU 最大","difficulty":"難易度","avgtime":"平均時間",
@@ -261,7 +285,7 @@ I18N = {
  "nonce":"nonce النشر (CREATE؛ 0 = أول عقد)",
  "ncount":"فحص قيم nonce (العدد بدءًا من nonce البداية؛ 1 = هذه فقط، مثلاً 2 = nonce 0 أو 1)",
  "salt":"Salt (CREATE2، hex بطول 32 بايت) — اختياري","initcode":"Init code (CREATE2، hex) — اختياري",
- "sec_perf":"أداء GPU والحماية","res_passphrase":"عبارة المرور (احفظها مع العبارة التذكيرية)","sec_cpu":"خيوط CPU","cpu_threads":"خيوط","no_gpu_build":"لا يوجد ثنائي CUDA في هذا الإصدار (./vanity) — مثلاً macOS لا يدعم CUDA/NVIDIA. CPU فقط.",
+ "sec_perf":"أداء GPU والحماية","res_passphrase":"عبارة المرور (احفظها مع العبارة التذكيرية)","sec_cpu":"خيوط CPU","cpu_threads":"خيوط","no_gpu_build":"لا يوجد ثنائي CUDA في هذا الإصدار (./vanity) — مثلاً macOS لا يدعم CUDA/NVIDIA. CPU فقط.","gpu_no_device":"GPU متوقف — لم يتم اكتشاف أي GPU أو برنامج تشغيل NVIDIA على هذا الجهاز. يتم استخدام CPU.",
  "gpu_hint":"يحدّ من استخدام GPU عبر دورة التشغيل → دفعات نواة قصيرة تُبقي سطح المكتب مستجيبًا. يُوصى بـ ≤ 80% (GPU واحد).",
  "start":"بدء البحث","stop":"إيقاف","speed":"السرعة","tried":"المُجرَّبة","burst":"الدفعة","eta":"الوقت المتبقّي",
  "gpu_max":"الحد الأقصى لـ GPU","difficulty":"الصعوبة","avgtime":"متوسط الوقت",
@@ -429,14 +453,26 @@ class App(QWidget):
         self.src = self._segment(c, "source",  ["Raw Key","Seed 12","Seed 24"], 0, self._mode_changed)
         self.tgt = self._segment(c, "target",  ["Wallet","CREATE","CREATE2"], 0, self._mode_changed)
         self.bk  = self._segment(c, "backend", ["GPU","CPU","GPU+CPU"], 0, self._mode_changed)
-        if not gpu_build_present():
-            # No CUDA binary present (CPU-only download, or macOS — Apple has no CUDA).
-            # Detected, not assumed: if a ./vanity GPU build ever appears, these light up.
+        gpu_ok, self._gpu_reason = gpu_status()
+        if not gpu_ok:
+            # GPU genuinely unusable here. Two honest causes, detected not assumed:
+            #   no_gpu_build  -> no ./vanity CUDA binary (CPU-only build, or macOS)
+            #   gpu_no_device -> binary present but no NVIDIA card/driver is live
+            # Either way GPU + GPU+CPU are disabled and CPU is selected.
             for _i in (0, 2):
                 b = self.bk.button(_i)
                 b.setEnabled(False); b.setChecked(False)
-                b.setToolTip(self.T("no_gpu_build"))
+                b.setToolTip(self.T(self._gpu_reason))
             self.bk.button(1).setChecked(True)
+        # Visible "why is GPU off?" note — only shown when GPU is unavailable.
+        self.gpu_note = QLabel(); self.gpu_note.setObjectName("gpunote")
+        self.gpu_note.setWordWrap(True); self.gpu_note.setTextFormat(Qt.RichText)
+        if not gpu_ok:
+            c.addSpacing(4); c.addWidget(self.gpu_note)
+            self._reg(lambda: self.gpu_note.setText(
+                "<span style='color:%s'>&#9432;</span>&nbsp; %s" % (YELLOW, self.T(self._gpu_reason))))
+        else:
+            self.gpu_note.hide()
         c.addSpacing(6)
         self.passphrase, self.pp_wrap_box = self._labeled_input("passphrase", "", False)
         self.nonce, self.nonce_box = self._labeled_input("nonce", "0", True)
