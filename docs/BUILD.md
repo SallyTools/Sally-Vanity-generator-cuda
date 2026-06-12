@@ -43,7 +43,7 @@ compiler + `pip --user`).
 ## Cross-platform release builds
 
 `.github/workflows/release.yml` builds, on every `v*` tag, portable CPU binaries for Linux
-x86_64, macOS x86_64 / arm64, and Windows x86_64 (MinGW, static runtime), plus a Linux CUDA
+x86_64, macOS arm64 (Apple Silicon), and Windows x86_64 (MinGW, static runtime), plus a Linux CUDA
 build — packaging each as a `.zip` release asset that also carries `gui/`, the installer(s),
 `assets/` (raster icons), `README.md` and `LICENSE`. (No `src/`, `Makefile`, `CHANGELOG.md`
 or SVGs — the zip is a runtime-only payload.)

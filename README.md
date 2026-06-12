@@ -47,7 +47,6 @@ Generate Ethereum addresses that **start or end with the characters you want** â
    |--------|------|
    | Linux (Intel/AMD) | `sally-vanity-eth-linux-x86_64.zip` |
    | Linux (CUDA GPU)  | `sally-vanity-eth-linux-x86_64-cuda.zip` |
-   | macOS (Intel)     | `sally-vanity-eth-macos-x86_64.zip` |
    | macOS (Apple Silicon) | `sally-vanity-eth-macos-arm64.zip` |
    | Windows           | `sally-vanity-eth-windows-x86_64.zip` |
 

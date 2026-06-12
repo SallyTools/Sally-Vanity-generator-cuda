@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   # =========================================================================
-  # 1) Native CPU builds: Linux x86_64, macOS x86_64, macOS arm64
+  # 1) Native CPU builds: Linux x86_64, macOS arm64 (Apple Silicon)
   # =========================================================================
   cpu-native:
     name: cpu ${{ matrix.os }}-${{ matrix.arch }}
@@ -27,7 +27,6 @@ jobs:
       matrix:
         include:
           - { runner: ubuntu-latest, os: linux,  arch: x86_64 }
-          - { runner: macos-13,      os: macos,  arch: x86_64 }
           - { runner: macos-14,      os: macos,  arch: arm64  }
     steps:
       - uses: actions/checkout@v5
