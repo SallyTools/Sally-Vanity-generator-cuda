@@ -117,12 +117,14 @@ the host** before it is shown — a wrong key is never displayed.
 | **GPU** | *(default)* | fastest; needs an NVIDIA GPU + CUDA |
 | **CPU** | `--cpu` | no GPU needed — runs anywhere, auto-fallback if the GPU is unusable |
 | **Hybrid** | `--hybrid` | runs **GPU + CPU at once** on disjoint key ranges, first to find wins |
+| **CPU threads** | `--threads N` | cap CPU worker count (default: all cores); applies to `--cpu` and `--hybrid` |
 
 ```bash
 ./vanity --hybrid --mode seed12 --prefix cafe     # GPU and CPU search together
+./vanity --cpu --threads 4 --prefix dead          # limit CPU to 4 worker threads
 ```
 
-Hybrid mainly helps **seed mode** (the CPU's ~40k/s adds ~30–50% to the GPU's ~100k/s);
+Hybrid mainly helps **seed mode** (the CPU's ~40k/s adds ~25–35% to the GPU's ~135k/s);
 in raw mode the GPU dominates so the gain is negligible. The live rate shows the combined
 `Maddr/s (gpu+cpu)`.
 
@@ -219,7 +221,8 @@ src/    crypto/wallet headers — field, ec, ec_fast, keccak, sha256, sha512,
         search_cpu, output
         vanity.cu  (the CLI driver → GPU via nvcc, CPU via g++), selftest.cu
 gui/    app.py  (PySide6 native app — the only UI; 10 languages)
-assets/ banner.svg
+docs/   ARCHITECTURE · SECURITY · USAGE · BUILD
+assets/ hero.svg (README hero) · icon set (svg/png/ico/icns) · make_icons.sh
 .github/workflows/release.yml   cross-platform build + .zip release
 install.sh / install.ps1 / install.py   cross-OS installer
 Makefile · LICENSE (MIT) · CHANGELOG.md · .gitignore

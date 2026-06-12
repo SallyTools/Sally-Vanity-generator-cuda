@@ -8,7 +8,10 @@ aims for [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Live **GPU / CPU temperature** in the app footer (bottom-left, non-blocking poll) and a
-  clickable **sally.tools** backlink.
+  clickable **sally.tools** backlink; a live **elapsed-time** readout while a search runs.
+- Adjustable **CPU worker count** (`--threads N` + a CPU-threads slider in the app).
+- The **passphrase value is now shown** with the result (mnemonic + passphrase + address +
+  private key of the real vanity wallet — everything needed to save/restore it).
 - **Hybrid CPU+GPU** search (`--hybrid`) — both backends run concurrently on disjoint key
   ranges, first to find wins, combined throughput shown as `Maddr/s (gpu+cpu)`.
 - **GPU elevation** in the desktop app: when the GPU isn't usable without permissions the

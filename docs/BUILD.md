@@ -44,8 +44,9 @@ compiler + `pip --user`).
 
 `.github/workflows/release.yml` builds, on every `v*` tag, portable CPU binaries for Linux
 x86_64, macOS x86_64 / arm64, and Windows x86_64 (MinGW, static runtime), plus a Linux CUDA
-build — packaging each as a `.zip` release asset that also carries `gui/`, `src/`, the
-installer, `assets/` (icons), `README.md`, `LICENSE` and `CHANGELOG.md`.
+build — packaging each as a `.zip` release asset that also carries `gui/`, the installer(s),
+`assets/` (raster icons), `README.md` and `LICENSE`. (No `src/`, `Makefile`, `CHANGELOG.md`
+or SVGs — the zip is a runtime-only payload.)
 
 > **Why only 64-bit targets:** the crypto core relies on `unsigned __int128`, which exists
 > only on 64-bit GCC/Clang targets. On any other architecture (e.g. 32-bit ARM, or 64-bit

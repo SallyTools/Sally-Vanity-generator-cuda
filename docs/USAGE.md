@@ -13,7 +13,7 @@ Task-oriented walkthroughs. Run the desktop app (`python3 gui/app.py`) or the CL
 ./vanity --prefix dead --suffix beef          # address starts 0xdead… and ends …beef
 ```
 Returns a private key you can import as an account in MetaMask (Import account → Private
-key). Pattern length vs. time: each extra hex char is ~16× harder; at ~380 M/s a 9–10 char
+key). Pattern length vs. time: each extra hex char is ~16× harder; at ~400 M/s a 9–10 char
 pattern is routine.
 
 ## Seed-phrase vanity (wallet-importable)
@@ -23,7 +23,7 @@ pattern is routine.
 ./vanity --mode seed24 --prefix a11ce         # 24-word
 ```
 Returns a **BIP39 mnemonic** (path `m/44'/60'/0'/0/0`). Import it into MetaMask / SafePal /
-Ledger / Trezor as a recovery phrase. Seed mode is heavier (~100k/s on a 2060) — **≤ 6–7
+Ledger / Trezor as a recovery phrase. Seed mode is heavier (~135k/s on a 2060) — **≤ 6–7
 chars** is comfortable. Use `--hybrid` to add CPU throughput.
 
 ## Hidden-wallet vanity (SafePal passphrase)
@@ -55,9 +55,10 @@ salt and init code (or `--inithash` if you already have the code hash).
 ## Backends
 
 ```bash
-./vanity            # GPU (default)
-./vanity --cpu      # CPU only (no GPU / no sudo)
-./vanity --hybrid   # GPU + CPU together (best for seed mode)
+./vanity                       # GPU (default)
+./vanity --cpu                 # CPU only (no GPU / no sudo)
+./vanity --hybrid              # GPU + CPU together (best for seed mode)
+./vanity --cpu --threads 4     # cap CPU worker threads (default: all cores)
 ```
 If the GPU isn't usable without elevated permissions, the tool prints `[gpu-fallback]` and
 continues on CPU. The GUI then shows **⚡ Enable GPU**; the persistent fix is

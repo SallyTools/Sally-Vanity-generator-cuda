@@ -122,8 +122,10 @@ shared result slot:
   engines never test the same `SHA256(base‖index)` candidate and throughput is additive.
 - **Unified reporting.** A single reporter thread sums `g_gpu_done` + `g_tried` and renders
   one `Maddr/s (gpu+cpu)` line.
-- **Reality:** raw mode CPU adds ~1–2% to a 380 M/s GPU (negligible); seed mode CPU
-  (~40k/s on 8 cores) adds **~30–50%** to a ~100k/s GPU — hybrid is mainly a seed-mode win.
+- **Reality:** raw mode CPU adds ~1–2% to a ~400 M/s GPU (negligible); seed mode CPU
+  (~40k/s on 8 cores) adds **~25–35%** to a ~135k/s GPU — hybrid is mainly a seed-mode win.
+- **CPU worker count** is capped with `--threads N` (default: all cores), for `--cpu` and
+  the CPU side of `--hybrid`.
 
 When CUDA is unavailable (no device, or the context can't init without elevated
 permissions) hybrid degrades to CPU-only — see [SECURITY.md](SECURITY.md#gpu-access--elevation).
