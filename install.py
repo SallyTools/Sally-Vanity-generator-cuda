@@ -3,11 +3,12 @@
 Sally-Vanity-generator-cuda — cross-platform installer.
 
 Covers Linux (apt/dnf/pacman/zypper), macOS (brew) and Windows. It:
-  1. ensures a C++ toolchain + make,
-  2. installs the PySide6 GUI dependency (pip),
-  3. best-effort installs the JetBrains Mono font,
-  4. detects CUDA (nvcc) -> builds the GPU binary; always builds the CPU binary,
-  5. optionally launches the app (--run).
+  1. installs the PySide6 GUI dependency (pip),
+  2. best-effort installs the JetBrains Mono font,
+  3. uses the prebuilt binary shipped in a release .zip; or, in a source
+     checkout (Makefile present), ensures a C++ toolchain and builds from source
+     (CUDA GPU binary if nvcc is present, plus the portable CPU binary),
+  4. optionally launches the app (--run).
 
 Nothing here is destructive; missing pieces are reported with the exact command
 to fix them rather than failing hard. Re-run any time; it is idempotent.
@@ -120,7 +121,18 @@ def ensure_font(pm, sudo, yes, skip):
     except Exception:
         warn("font install skipped (non-fatal)")
 
+def prebuilt_binaries():
+    """Runtime binaries shipped next to this installer (a release .zip ships these,
+    with no sources/Makefile — so there is nothing to compile)."""
+    names = ["vanity", "vanity-cpu", "vanity.exe", "vanity-cpu.exe"]
+    return [n for n in names if os.path.exists(os.path.join(ROOT, n))]
+
 def build(cpu_only):
+    # Release .zip: prebuilt binary present and no Makefile to build from — just use it.
+    pre = prebuilt_binaries()
+    if pre and not os.path.exists(os.path.join(ROOT, "Makefile")):
+        ok("using prebuilt binary: " + ", ".join("./" + p for p in pre))
+        return True
     have_nvcc = have("nvcc")
     have_make = have("make")
     if not have_make:
@@ -195,7 +207,9 @@ def main():
     elif not IS_WIN: warn("no known package manager detected — manual steps may be needed")
     sudo = IS_LINUX and os.geteuid() != 0
 
-    if not IS_WIN: ensure_toolchain(pm, sudo, a.yes)
+    # A release .zip ships a prebuilt binary and no Makefile — no compiler needed.
+    build_from_source = os.path.exists(os.path.join(ROOT, "Makefile"))
+    if not IS_WIN and build_from_source: ensure_toolchain(pm, sudo, a.yes)
     okp = ensure_pyside(a.yes)
     ensure_font(pm, sudo, a.yes, a.no_font or IS_WIN)
     okb = build(a.cpu_only)

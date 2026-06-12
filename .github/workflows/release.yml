@@ -55,11 +55,14 @@ jobs:
         shell: bash
         run: |
           DEST="sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}"
-          mkdir -p "$DEST"
+          mkdir -p "$DEST/assets"
+          # Runtime-only payload: the prebuilt binaries, the GUI, the installer
+          # (PySide6 setup + launcher), license/readme, and the raster icons the
+          # app/desktop-entry load. No sources, Makefile, or SVG/build assets.
           cp vanity-cpu selftest-cpu "$DEST"/
-          cp -r gui src "$DEST"/
-          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
-          [ -d assets ] && cp -r assets "$DEST"/ || true
+          cp -r gui "$DEST"/
+          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
+          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
           if command -v zip >/dev/null; then zip -r "${DEST}.zip" "$DEST";
           else ditto -c -k --keepParent "$DEST" "${DEST}.zip"; fi
 
@@ -93,11 +96,12 @@ jobs:
       - name: Package
         run: |
           DEST="sally-vanity-eth-windows-x86_64"
-          mkdir -p "$DEST"
+          mkdir -p "$DEST/assets"
+          # Runtime-only payload (see cpu-native job for rationale).
           cp vanity-cpu.exe selftest-cpu.exe "$DEST"/
-          cp -r gui src "$DEST"/
-          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
-          [ -d assets ] && cp -r assets "$DEST"/ || true
+          cp -r gui "$DEST"/
+          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
+          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
           zip -r "${DEST}.zip" "$DEST"
       - uses: actions/upload-artifact@v7
         with:
@@ -130,11 +134,12 @@ jobs:
         shell: bash
         run: |
           DEST="sally-vanity-eth-linux-x86_64-cuda"
-          mkdir -p "$DEST"
+          mkdir -p "$DEST/assets"
+          # Runtime-only payload (see cpu-native job for rationale).
           cp vanity selftest "$DEST"/
-          cp -r gui src "$DEST"/
-          cp install.sh install.ps1 install.py README.md Makefile LICENSE CHANGELOG.md "$DEST"/
-          [ -d assets ] && cp -r assets "$DEST"/ || true
+          cp -r gui "$DEST"/
+          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
+          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
           zip -r "${DEST}.zip" "$DEST"
       - uses: actions/upload-artifact@v7
         with:
