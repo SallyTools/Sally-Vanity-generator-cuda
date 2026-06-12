@@ -9,7 +9,7 @@
 
 <p align="center">
   <img alt="Backend" src="https://img.shields.io/badge/backend-CUDA%20%7C%20CPU%20%7C%20Hybrid-F0B90B?style=for-the-badge&labelColor=0A0E17&logo=nvidia&logoColor=white">
-  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows%20%7C%20ARM64-0052FF?style=for-the-badge&labelColor=0A0E17">
+  <img alt="Platforms" src="https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-0052FF?style=for-the-badge&labelColor=0A0E17">
 </p>
 <p align="center">
   <img alt="Offline" src="https://img.shields.io/badge/network-100%25%20offline-0052FF?style=flat-square&labelColor=0A0E17">
@@ -47,7 +47,6 @@ Generate Ethereum addresses that **start or end with the characters you want** �
    |--------|------|
    | Linux (Intel/AMD) | `sally-vanity-eth-linux-x86_64.zip` |
    | Linux (CUDA GPU)  | `sally-vanity-eth-linux-x86_64-cuda.zip` |
-   | Linux (ARM64 / Raspberry Pi 64-bit) | `sally-vanity-eth-linux-aarch64.zip` |
    | macOS (Intel)     | `sally-vanity-eth-macos-x86_64.zip` |
    | macOS (Apple Silicon) | `sally-vanity-eth-macos-arm64.zip` |
    | Windows           | `sally-vanity-eth-windows-x86_64.zip` |
@@ -140,13 +139,12 @@ one-time `sudo usermod -aG render,video $USER`. See [Security → GPU access](do
 | Platform | CPU build | GPU (CUDA) build |
 |----------|:---------:|:----------------:|
 | Linux x86_64 | ✅ | ✅ |
-| Linux ARM64 (aarch64, Raspberry Pi 64-bit OS) | ✅ | — |
 | macOS Intel / Apple Silicon | ✅ | — (no CUDA on macOS) |
 | Windows x86_64 | ✅ (MinGW) | build locally |
 
-> 32-bit ARM (armv6/armv7) is intentionally **not** shipped: the crypto core relies on
-> 128-bit integer math that only exists on 64-bit targets, and we never publish
-> key-generation binaries we cannot verify. Use a 64-bit OS (Raspberry Pi OS 64-bit).
+> The crypto core relies on 128-bit integer math (`unsigned __int128`) that exists only on
+> 64-bit GCC/Clang targets — so prebuilt binaries are shipped for the 64-bit platforms
+> above. On other architectures, build from source with `make cpu`.
 
 Prebuilt `.zip`s for all of the above are produced automatically on every tagged release
 by [GitHub Actions](.github/workflows/release.yml).

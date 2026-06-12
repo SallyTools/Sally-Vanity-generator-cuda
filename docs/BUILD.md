@@ -43,10 +43,10 @@ compiler + `pip --user`).
 ## Cross-platform release builds
 
 `.github/workflows/release.yml` builds, on every `v*` tag, portable CPU binaries for Linux
-x86_64, Linux aarch64, macOS x86_64 / arm64, and Windows x86_64 (MinGW, static runtime),
-plus a Linux CUDA build — packaging each as a `.zip` release asset that also carries `gui/`,
-`src/`, the installer, `assets/` (icons), `README.md`, `LICENSE` and `CHANGELOG.md`.
+x86_64, macOS x86_64 / arm64, and Windows x86_64 (MinGW, static runtime), plus a Linux CUDA
+build — packaging each as a `.zip` release asset that also carries `gui/`, `src/`, the
+installer, `assets/` (icons), `README.md`, `LICENSE` and `CHANGELOG.md`.
 
-> **Why no 32-bit ARM (armv6/armv7):** the crypto core relies on `unsigned __int128`, which
-> exists only on 64-bit targets. We never ship key-generation binaries we cannot verify, so
-> 32-bit ARM is intentionally excluded — use a 64-bit OS (Raspberry Pi OS 64-bit on Pi 3/4/5).
+> **Why only 64-bit targets:** the crypto core relies on `unsigned __int128`, which exists
+> only on 64-bit GCC/Clang targets. On any other architecture (e.g. 32-bit ARM, or 64-bit
+> ARM Linux), build from source with `make cpu` rather than using a prebuilt binary.

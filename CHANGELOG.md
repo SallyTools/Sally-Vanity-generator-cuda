@@ -28,7 +28,7 @@ aims for [Semantic Versioning](https://semver.org/).
   localized into **10 languages** (EN, DE, ES, FR, PT, RU, ZH, JA, HI, AR).
 - Cross-platform **installer** (`install.sh` / `install.ps1` / `install.py`).
 - **GitHub Actions** release workflow: builds CPU binaries for Linux x86_64,
-  Linux aarch64, macOS x86_64/arm64, Windows x86_64, plus a Linux CUDA build, and
+  macOS x86_64/arm64, Windows x86_64, plus a Linux CUDA build, and
   publishes per-target `.zip` assets.
 - Host-side **failsafe**: every result is independently re-derived and re-checked
   against the pattern before display.
