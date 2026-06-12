@@ -677,6 +677,20 @@ class App(QWidget):
     def _tick_elapsed(self):
         if self._t_start>0:
             el=int(time.monotonic()-self._t_start); self.runtime.setText(f"· {el//60}:{el%60:02d}")
+            self._refresh_title()
+    def _refresh_title(self):
+        """Window / taskbar / dock / alt-tab title: the app name plus the live status,
+        so it reads 'SallyVanity' when idle and 'SallyVanity — searching… m:ss' while a
+        search runs (and '… — found' on a hit)."""
+        name = "SallyVanity"
+        if self._found:
+            t = f"{name} — {self.T('st_found')}"
+        elif self._running:
+            el = int(time.monotonic()-self._t_start) if self._t_start>0 else 0
+            t = f"{name} — {self.T('st_search')} {el//60}:{el%60:02d}"
+        else:
+            t = name
+        self.setWindowTitle(t)
     def _set_running(self, running, found=False):
         self._running = running; self._found = found
         self.start.setEnabled(not running); self.stopb.setEnabled(running)
@@ -685,6 +699,7 @@ class App(QWidget):
         else:       self.dot.setStyleSheet("color:rgba(255,255,255,70); font-size:11px"); self.stext.setText(self.T("st_idle"))
         if running: self._t_start=time.monotonic(); self.runtime.setText("· 0:00"); self._run_timer.start(1000)
         else: self._run_timer.stop()
+        self._refresh_title()
     def _toggle_key(self):
         if self.key.echoMode() == QLineEdit.Password: self.key.setEchoMode(QLineEdit.Normal); self.revealb.setText(f"[{self.T('hide')}]")
         else: self.key.setEchoMode(QLineEdit.Password); self.revealb.setText(f"[{self.T('show')}]")
@@ -823,6 +838,10 @@ if __name__ == "__main__":
             import ctypes; ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Sally.Vanity.ETH.1")
         except Exception: pass
     app = QApplication(sys.argv)
+    # App name shown by the OS — menu bar (macOS), dock/taskbar, alt-tab, .desktop.
+    app.setApplicationName("SallyVanity")
+    app.setApplicationDisplayName("SallyVanity")
+    app.setDesktopFileName("SallyVanity")
     app.setFont(QFont("JetBrains Mono", 10))
     app.setStyleSheet(QSS)          # reaches QMenu/QComboBox-popup/QToolTip top-level windows
     icon = app_icon()
