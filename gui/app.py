@@ -679,18 +679,22 @@ class App(QWidget):
             el=int(time.monotonic()-self._t_start); self.runtime.setText(f"· {el//60}:{el%60:02d}")
             self._refresh_title()
     def _refresh_title(self):
-        """Window / taskbar / dock / alt-tab title: the app name plus the live status,
-        so it reads 'SallyVanity' when idle and 'SallyVanity — searching… m:ss' while a
-        search runs (and '… — found' on a hit)."""
+        """Window / taskbar / dock / alt-tab title: app name + live status. Idle →
+        'SallyVanity'; running → 'SallyVanity — searching… m:ss · <speed> · ETA <eta>'
+        (speed/ETA appear once the engine reports them); hit → 'SallyVanity — found'."""
         name = "SallyVanity"
         if self._found:
-            t = f"{name} — {self.T('st_found')}"
-        elif self._running:
-            el = int(time.monotonic()-self._t_start) if self._t_start>0 else 0
-            t = f"{name} — {self.T('st_search')} {el//60}:{el%60:02d}"
-        else:
-            t = name
-        self.setWindowTitle(t)
+            self.setWindowTitle(f"{name} — {self.T('st_found')}"); return
+        if not self._running:
+            self.setWindowTitle(name); return
+        el = int(time.monotonic()-self._t_start) if self._t_start>0 else 0
+        parts = [f"{self.T('st_search')} {el//60}:{el%60:02d}"]
+        if self.live_rate > 0:
+            parts.append(f"{self.live_rate:.3f} M/s" if self._is_seed() else f"{self.live_rate:.0f} M/s")
+        eta = self.s_eta.text() if hasattr(self, "s_eta") else ""
+        if eta and eta not in ("—", "0s"):
+            parts.append(f"{self.T('eta')} {eta}")
+        self.setWindowTitle(f"{name} — " + "  ·  ".join(parts))
     def _set_running(self, running, found=False):
         self._running = running; self._found = found
         self.start.setEnabled(not running); self.stopb.setEnabled(running)
@@ -799,7 +803,7 @@ class App(QWidget):
                 self.s_tried.setText(f"{float(m.group(1)):.3f} G")
                 self.s_rate.setText(f"{float(m.group(3)):.3f} M/s" if self._is_seed() else f"{float(m.group(3)):.0f} M/s")
                 b = BURST.search(line); self.s_burst.setText(f"{float(b.group(1)):.0f} ms" if b else "—")
-                self.s_eta.setText(self._fmt(float(m.group(4)))); self._recalc()
+                self.s_eta.setText(self._fmt(float(m.group(4)))); self._recalc(); self._refresh_title()
             if "[gpu-fallback]" in line and sys.platform != "darwin":
                 self.elevate.setVisible(True); self.adjustSize()
             mn = MNE.search(line)
@@ -838,10 +842,14 @@ if __name__ == "__main__":
             import ctypes; ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Sally.Vanity.ETH.1")
         except Exception: pass
     app = QApplication(sys.argv)
-    # App name shown by the OS — menu bar (macOS), dock/taskbar, alt-tab, .desktop.
+    # App name shown by the OS — dock/taskbar, alt-tab, .desktop (WM_CLASS).
     app.setApplicationName("SallyVanity")
-    app.setApplicationDisplayName("SallyVanity")
     app.setDesktopFileName("SallyVanity")
+    # Force the display name EMPTY. Qt appends applicationDisplayName() to every window
+    # title, and that getter falls back to applicationName() when unset — so leaving it
+    # alone would still tack a redundant "— SallyVanity" onto our title. Our windowTitle
+    # already starts with the name and carries the live status / speed / ETA itself.
+    app.setApplicationDisplayName("")
     app.setFont(QFont("JetBrains Mono", 10))
     app.setStyleSheet(QSS)          # reaches QMenu/QComboBox-popup/QToolTip top-level windows
     icon = app_icon()
