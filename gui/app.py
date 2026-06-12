@@ -13,19 +13,32 @@ from PySide6.QtWidgets import (QApplication, QWidget, QFrame, QLabel, QLineEdit,
     QSlider, QVBoxLayout, QHBoxLayout, QGridLayout, QButtonGroup, QComboBox, QGraphicsDropShadowEffect)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.normpath(os.path.join(HERE, ".."))
-ASSETS = os.path.join(ROOT, "assets")
+# Base directory for bundled data (engine binaries + assets). When packaged by
+# PyInstaller (--onefile) everything is unpacked under sys._MEIPASS; in a normal
+# source checkout it all lives at the repo root, one level above gui/.
+if getattr(sys, "frozen", False):
+    BASE = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(sys.executable)))
+else:
+    BASE = os.path.normpath(os.path.join(HERE, ".."))
+ROOT = BASE
+ASSETS = os.path.join(BASE, "assets")
 def asset(name): return os.path.join(ASSETS, name)
-BIN_GPU = os.path.join(ROOT, "vanity")
-BIN_CPU = os.path.join(ROOT, "vanity-cpu")
+def _bin(name):
+    """Resolve an engine binary path, tolerating the Windows .exe suffix."""
+    p = os.path.join(BASE, name)
+    if os.name == "nt" or os.path.exists(p + ".exe"):
+        return p + ".exe"
+    return p
+BIN_GPU = _bin("vanity")
+BIN_CPU = _bin("vanity-cpu")
 
 def gpu_build_present():
-    """True if a CUDA (GPU) binary was actually built/shipped next to us. We do NOT
-    assume per-OS — we detect the real artifact. nvcc only ever produces ./vanity on
-    a machine with the CUDA Toolkit, so its presence is the honest capability signal.
-    On macOS this is always False (Apple has no NVIDIA GPU and CUDA has no macOS
-    target — the last macOS CUDA was 10.2/2019, x86-only, never on Apple Silicon)."""
-    return os.path.exists(BIN_GPU) or os.path.exists(BIN_GPU + ".exe")
+    """True if a CUDA (GPU) binary was actually built/shipped next to us (or bundled
+    into the frozen executable). We do NOT assume per-OS — we detect the real artifact.
+    nvcc only ever produces ./vanity on a machine with the CUDA Toolkit, so its presence
+    is the honest capability signal. On macOS this is always False (Apple has no NVIDIA
+    GPU and CUDA has no macOS target — last macOS CUDA was 10.2/2019, x86-only)."""
+    return os.path.exists(BIN_GPU)
 
 def nvidia_device_present():
     """Best-effort, non-blocking: is an NVIDIA GPU visible to the OS right now?
@@ -773,6 +786,10 @@ class App(QWidget):
         built, errmsg = self._build_args()
         if errmsg: self.err.setText(errmsg); return
         binp, args = built
+        if getattr(sys, "frozen", False) and os.name != "nt":
+            # the engine is unpacked from the onefile bundle — make sure it's executable
+            try: os.chmod(binp, os.stat(binp).st_mode | 0o111)
+            except OSError: pass
         if elevated:
             program, arglist = elevate_cmd(binp, args)
             if program is None:
@@ -837,6 +854,13 @@ def app_icon():
     return ic
 
 if __name__ == "__main__":
+    if os.environ.get("SV_SELFCHECK"):   # diagnostics: verify bundled engine + assets
+        print("frozen     :", getattr(sys, "frozen", False))
+        print("BASE       :", BASE)
+        print("GPU engine :", os.path.exists(BIN_GPU), "->", BIN_GPU)
+        print("CPU engine :", os.path.exists(BIN_CPU), "->", BIN_CPU)
+        print("assets dir :", os.path.isdir(ASSETS), "->", ASSETS)
+        sys.exit(0)
     if sys.platform == "win32":
         try:
             import ctypes; ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Sally.Vanity.ETH.1")

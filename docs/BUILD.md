@@ -42,11 +42,12 @@ compiler + `pip --user`).
 
 ## Cross-platform release builds
 
-`.github/workflows/release.yml` builds, on every `v*` tag, portable CPU binaries for Linux
-x86_64, macOS arm64 (Apple Silicon), and Windows x86_64 (MinGW, static runtime), plus a Linux CUDA
-build — packaging each as a `.zip` release asset that also carries `gui/`, the installer(s),
-`assets/` (raster icons), `README.md` and `LICENSE`. (No `src/`, `Makefile`, `CHANGELOG.md`
-or SVGs — the zip is a runtime-only payload.)
+`.github/workflows/release.yml` builds, on every `v*` tag, **one self-contained executable**
+per platform with PyInstaller `--onefile`: Linux x86_64, Linux x86_64 CUDA (GPU+CPU), Windows
+x86_64 (`.exe`) and macOS arm64 (Apple Silicon). Each file bundles the PySide6 GUI, the Python
+runtime, the bundled `assets/` and the native engine(s) — so the user downloads a single file
+and runs it, with no Python, unzip or installer. The engines are linked with a static C++ /
+OpenMP runtime (and a static CUDA runtime for the GPU build, so it needs only the NVIDIA driver).
 
 > **Why only 64-bit targets:** the crypto core relies on `unsigned __int128`, which exists
 > only on 64-bit GCC/Clang targets. On any other architecture (e.g. 32-bit ARM, or 64-bit

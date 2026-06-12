@@ -15,6 +15,10 @@ __pycache__/
 
 # Release staging (produced by CI / packaging)
 dist/
+build/
+*.spec
+/SallyVanity
+/SallyVanity-*
 sally-vanity-eth-*/
 sally-vanity-eth-*.zip
 

@@ -1,12 +1,12 @@
 name: release
 
-# Build portable CPU binaries (and Linux CUDA binaries) for many platforms on a
-# version tag, then publish them as .zip assets on the GitHub Release.
+# Build ONE self-contained executable per platform with PyInstaller --onefile:
+# the PySide6 GUI, the Python runtime, and the native vanity engine(s) are all bundled
+# into a single file. Users download one executable — no Python, no separate binary,
+# no installer. Windows ships a .exe; Linux and macOS ship native executables.
 #
-# Portability note: the crypto core uses 128-bit integer math (`unsigned __int128`),
-# which exists only on 64-bit targets and only on GCC/Clang (not MSVC). Therefore:
-#   * Windows CPU build uses MinGW-w64 g++ (supports __int128), not MSVC cl.
-#   * Windows CUDA is not built in CI (nvcc's host compiler on Windows is MSVC).
+# 128-bit math note: the crypto core uses `unsigned __int128` (64-bit GCC/Clang only),
+# so Windows is built with MinGW-w64 g++ (not MSVC) and only 64-bit targets ship.
 on:
   push:
     tags: ["v*"]
@@ -17,141 +17,162 @@ permissions:
 
 jobs:
   # =========================================================================
-  # 1) Native CPU builds: Linux x86_64, macOS arm64 (Apple Silicon)
+  # Linux x86_64 — CPU engine bundled
   # =========================================================================
-  cpu-native:
-    name: cpu ${{ matrix.os }}-${{ matrix.arch }}
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { runner: ubuntu-latest, os: linux,  arch: x86_64 }
-          - { runner: macos-14,      os: macos,  arch: arm64  }
+  linux-cpu:
+    name: linux-x86_64 (cpu)
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-
-      - name: Build (Linux g++)
-        if: matrix.os == 'linux'
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Build engine (g++, static C++ runtime)
         run: |
-          g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/vanity.cu   -o vanity-cpu
-          g++ -O3 -std=c++17 -fopenmp -pthread -x c++ -Isrc src/selftest.cu -o selftest-cpu
-
-      - name: Build (macOS clang + libomp)
-        if: matrix.os == 'macos'
-        run: |
-          brew install libomp
-          OMP="$(brew --prefix libomp)"
-          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
-            -x c++ -Isrc src/vanity.cu   -L"$OMP/lib" -lomp -o vanity-cpu
-          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
-            -x c++ -Isrc src/selftest.cu -L"$OMP/lib" -lomp -o selftest-cpu
-
+          g++ -O3 -std=c++17 -fopenmp -pthread -static-libgcc -static-libstdc++ \
+            -x c++ -Isrc src/vanity.cu   -o vanity-cpu
+          g++ -O3 -std=c++17 -fopenmp -pthread \
+            -x c++ -Isrc src/selftest.cu -o selftest-cpu
       - name: Selftest (gate)
         run: ./selftest-cpu
-
-      - name: Package
-        shell: bash
+      - name: Bundle one-file executable
         run: |
-          DEST="sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}"
-          mkdir -p "$DEST/assets"
-          # Runtime-only payload: the prebuilt binaries, the GUI, the installer
-          # (PySide6 setup + launcher), license/readme, and the raster icons the
-          # app/desktop-entry load. No sources, Makefile, or SVG/build assets.
-          cp vanity-cpu selftest-cpu "$DEST"/
-          cp -r gui "$DEST"/
-          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
-          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
-          if command -v zip >/dev/null; then zip -r "${DEST}.zip" "$DEST";
-          else ditto -c -k --keepParent "$DEST" "${DEST}.zip"; fi
-
+          python -m pip install --quiet pyinstaller PySide6 psutil
+          pyinstaller --onefile --noconsole --clean --noconfirm \
+            --name SallyVanity-linux-x86_64 \
+            --add-binary "vanity-cpu:." \
+            --add-data "assets:assets" \
+            gui/app.py
+          SV_SELFCHECK=1 dist/SallyVanity-linux-x86_64   # verify the bundle
       - uses: actions/upload-artifact@v7
         with:
-          name: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}
-          path: sally-vanity-eth-${{ matrix.os }}-${{ matrix.arch }}.zip
+          name: SallyVanity-linux-x86_64
+          path: dist/SallyVanity-linux-x86_64
           if-no-files-found: error
 
   # =========================================================================
-  # 2) Windows CPU build via MinGW-w64 g++ (MSVC cl lacks __int128)
+  # Linux x86_64 CUDA — GPU + CPU engines bundled (GPU/Hybrid usable)
   # =========================================================================
-  cpu-windows:
-    name: cpu windows-x86_64
+  linux-cuda:
+    name: linux-x86_64-cuda (gpu+cpu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: Jimver/cuda-toolkit@v0.2.35
+        with:
+          cuda: "12.6.2"
+          method: network
+          # Only the compiler + runtime dev libs; the full meta-package pulls the
+          # driver/DKMS, which fails to build on the driverless CI runner.
+          sub-packages: '["nvcc", "cudart-dev"]'
+      - name: Build engines (nvcc GPU w/ static cudart + g++ CPU)
+        run: |
+          # static cudart so the GPU binary needs only the NVIDIA driver (libcuda),
+          # not a full CUDA-toolkit install, on the user's machine.
+          make all NVCC="nvcc --cudart=static"
+          g++ -O3 -std=c++17 -fopenmp -pthread -static-libgcc -static-libstdc++ \
+            -x c++ -Isrc src/vanity.cu -o vanity-cpu
+      - name: Selftest (host-only, gate)
+        run: ./selftest
+      - name: Bundle one-file executable (GPU + CPU)
+        run: |
+          python -m pip install --quiet pyinstaller PySide6 psutil
+          pyinstaller --onefile --noconsole --clean --noconfirm \
+            --name SallyVanity-linux-x86_64-cuda \
+            --add-binary "vanity:." --add-binary "vanity-cpu:." \
+            --add-data "assets:assets" \
+            gui/app.py
+          SV_SELFCHECK=1 dist/SallyVanity-linux-x86_64-cuda
+      - uses: actions/upload-artifact@v7
+        with:
+          name: SallyVanity-linux-x86_64-cuda
+          path: dist/SallyVanity-linux-x86_64-cuda
+          if-no-files-found: error
+
+  # =========================================================================
+  # Windows x86_64 — CPU engine bundled (.exe). MinGW builds the engine, a
+  # native Python builds the onefile (MSVC lacks __int128, so not used for C++).
+  # =========================================================================
+  windows:
+    name: windows-x86_64 (cpu)
     runs-on: windows-latest
-    defaults:
-      run: { shell: 'msys2 {0}' }
     steps:
       - uses: actions/checkout@v5
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
-          install: mingw-w64-x86_64-gcc zip
-      - name: Build (MinGW g++, static runtime for a portable .exe)
+          install: mingw-w64-x86_64-gcc
+      - name: Build engine (MinGW g++, static runtime)
+        shell: 'msys2 {0}'
         run: |
           g++ -O3 -std=c++17 -fopenmp -pthread -static -x c++ -Isrc src/vanity.cu   -o vanity-cpu.exe
           g++ -O3 -std=c++17 -fopenmp -pthread -static -x c++ -Isrc src/selftest.cu -o selftest-cpu.exe
       - name: Selftest (gate)
+        shell: 'msys2 {0}'
         run: ./selftest-cpu.exe
-      - name: Package
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Bundle one-file .exe
+        shell: pwsh
         run: |
-          DEST="sally-vanity-eth-windows-x86_64"
-          mkdir -p "$DEST/assets"
-          # Runtime-only payload (see cpu-native job for rationale).
-          cp vanity-cpu.exe selftest-cpu.exe "$DEST"/
-          cp -r gui "$DEST"/
-          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
-          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
-          zip -r "${DEST}.zip" "$DEST"
+          python -m pip install --quiet pyinstaller PySide6 psutil
+          pyinstaller --onefile --noconsole --clean --noconfirm `
+            --name SallyVanity-windows-x86_64 `
+            --icon assets/icon.ico `
+            --add-binary "vanity-cpu.exe;." `
+            --add-data "assets;assets" `
+            gui/app.py
       - uses: actions/upload-artifact@v7
         with:
-          name: sally-vanity-eth-windows-x86_64
-          path: sally-vanity-eth-windows-x86_64.zip
+          name: SallyVanity-windows-x86_64
+          path: dist/SallyVanity-windows-x86_64.exe
           if-no-files-found: error
 
   # =========================================================================
-  # 3) Linux CUDA (GPU) build — nvcc compiles without a GPU present. The
-  #    host-only selftest still runs and gates correctness.
+  # macOS arm64 (Apple Silicon) — CPU engine bundled, static libomp
   # =========================================================================
-  cuda-linux:
-    name: cuda linux-x86_64
-    runs-on: ubuntu-latest
+  macos-arm64:
+    name: macos-arm64 (cpu)
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v5
-      - uses: Jimver/cuda-toolkit@v0.2.35
-        with:
-          cuda: "12.6.2"
-          method: network
-          # Install ONLY the compiler + runtime dev libs. The full meta-package
-          # pulls the NVIDIA driver + DKMS, whose kernel-module build fails on the
-          # driverless CI runner. nvcc + cudart-dev is all we need to compile/link.
-          sub-packages: '["nvcc", "cudart-dev"]'
-      - name: Build (nvcc)
-        run: make all
-      - name: Selftest (host-only, gate)
-        run: ./selftest
-      - name: Package
-        shell: bash
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Build engine (clang + static libomp)
         run: |
-          DEST="sally-vanity-eth-linux-x86_64-cuda"
-          mkdir -p "$DEST/assets"
-          # Runtime-only payload (see cpu-native job for rationale).
-          cp vanity selftest "$DEST"/
-          cp -r gui "$DEST"/
-          cp install.sh install.ps1 install.py README.md LICENSE "$DEST"/
-          cp assets/icon*.png assets/icon.ico assets/icon.icns "$DEST/assets/" 2>/dev/null || true
-          zip -r "${DEST}.zip" "$DEST"
+          brew install libomp
+          OMP="$(brew --prefix libomp)"
+          # link libomp.a statically so the bundled engine needs no brew dylib
+          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
+            -x c++ -Isrc src/vanity.cu   "$OMP/lib/libomp.a" -o vanity-cpu
+          clang++ -O3 -std=c++17 -Xpreprocessor -fopenmp -I"$OMP/include" -pthread \
+            -x c++ -Isrc src/selftest.cu "$OMP/lib/libomp.a" -o selftest-cpu
+      - name: Selftest (gate)
+        run: ./selftest-cpu
+      - name: Bundle one-file executable
+        run: |
+          python -m pip install --quiet pyinstaller PySide6 psutil
+          # no --windowed: that produces a .app bundle; we want a single file
+          pyinstaller --onefile --clean --noconfirm \
+            --name SallyVanity-macos-arm64 \
+            --add-binary "vanity-cpu:." \
+            --add-data "assets:assets" \
+            gui/app.py
+          SV_SELFCHECK=1 dist/SallyVanity-macos-arm64
       - uses: actions/upload-artifact@v7
         with:
-          name: sally-vanity-eth-linux-x86_64-cuda
-          path: sally-vanity-eth-linux-x86_64-cuda.zip
+          name: SallyVanity-macos-arm64
+          path: dist/SallyVanity-macos-arm64
           if-no-files-found: error
 
   # =========================================================================
-  # 4) Publish: gather all zips and attach to the GitHub Release
+  # Publish: gather the executables and attach them to the GitHub Release
   # =========================================================================
   release:
     name: publish release
-    needs: [cpu-native, cpu-windows, cuda-linux]
+    needs: [linux-cpu, linux-cuda, windows, macos-arm64]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -161,6 +182,6 @@ jobs:
         run: ls -la dist
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/SallyVanity-*
           generate_release_notes: true
           fail_on_unmatched_files: false

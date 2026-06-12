@@ -30,9 +30,11 @@ aims for [Semantic Versioning](https://semver.org/).
 - Native **PySide6** desktop app in a fixed Base-blue / Binance-yellow design,
   localized into **10 languages** (EN, DE, ES, FR, PT, RU, ZH, JA, HI, AR).
 - Cross-platform **installer** (`install.sh` / `install.ps1` / `install.py`).
-- **GitHub Actions** release workflow: builds CPU binaries for Linux x86_64,
-  macOS arm64 (Apple Silicon), Windows x86_64, plus a Linux CUDA build, and
-  publishes per-target `.zip` assets.
+- **Single-file executables**: the release workflow now bundles the GUI, the Python
+  runtime and the native engine(s) into **one self-contained file** per platform via
+  PyInstaller `--onefile` — Linux x86_64, Linux x86_64 CUDA (GPU+CPU), Windows x86_64
+  (`.exe`) and macOS arm64. No Python, unzip or installer needed; the engine is built
+  with a static C++/OpenMP runtime (and static CUDA runtime for the GPU build).
 - Host-side **failsafe**: every result is independently re-derived and re-checked
   against the pattern before display.
 

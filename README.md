@@ -39,27 +39,29 @@ Generate Ethereum addresses that **start or end with the characters you want** �
 
 ## ⬇️ Install (for everyone)
 
-### Option A — download a release (no compiler needed for the CPU build)
+### Option A — download a single executable (nothing else to install)
 
-1. Go to the [**Releases**](../../releases) page and download the `.zip` for your system:
+Each release is **one self-contained file** — the GUI, the Python runtime and the
+native vanity engine are all bundled inside. No Python, no unzip, no installer.
+
+1. Go to the [**Releases**](../../releases) page and download the file for your system:
 
    | System | File |
    |--------|------|
-   | Linux (Intel/AMD) | `sally-vanity-eth-linux-x86_64.zip` |
-   | Linux (CUDA GPU)  | `sally-vanity-eth-linux-x86_64-cuda.zip` |
-   | macOS (Apple Silicon) | `sally-vanity-eth-macos-arm64.zip` |
-   | Windows           | `sally-vanity-eth-windows-x86_64.zip` |
+   | Linux (Intel/AMD) | `SallyVanity-linux-x86_64` |
+   | Linux (CUDA GPU)  | `SallyVanity-linux-x86_64-cuda` |
+   | macOS (Apple Silicon) | `SallyVanity-macos-arm64` |
+   | Windows           | `SallyVanity-windows-x86_64.exe` |
 
-2. Unzip it, then run the installer (sets up the Python GUI dependency):
+2. Run it:
 
-   ```bash
-   # Linux / macOS
-   ./install.sh --run
-   ```
-   ```powershell
-   # Windows
-   powershell -ExecutionPolicy Bypass -File install.ps1
-   ```
+   - **Windows** — double-click `SallyVanity-windows-x86_64.exe`.
+   - **Linux / macOS** — make it executable once, then launch:
+     ```bash
+     chmod +x SallyVanity-linux-x86_64
+     ./SallyVanity-linux-x86_64
+     ```
+     On macOS the first launch may need **right-click → Open** (the binary is unsigned).
 
 ### Option B — one command from source
 
@@ -147,8 +149,8 @@ one-time `sudo usermod -aG render,video $USER`. See [Security → GPU access](do
 > 64-bit GCC/Clang targets — so prebuilt binaries are shipped for the 64-bit platforms
 > above. On other architectures, build from source with `make cpu`.
 
-Prebuilt `.zip`s for all of the above are produced automatically on every tagged release
-by [GitHub Actions](.github/workflows/release.yml).
+A prebuilt **single-file executable** for each of the above is produced automatically on every
+tagged release by [GitHub Actions](.github/workflows/release.yml).
 
 ---
 
@@ -222,7 +224,7 @@ src/    crypto/wallet headers — field, ec, ec_fast, keccak, sha256, sha512,
 gui/    app.py  (PySide6 native app — the only UI; 10 languages)
 docs/   ARCHITECTURE · SECURITY · USAGE · BUILD
 assets/ hero.svg (README hero) · icon set (svg/png/ico/icns) · make_icons.sh
-.github/workflows/release.yml   cross-platform build + .zip release
+.github/workflows/release.yml   cross-platform build + one-file executable release
 install.sh / install.ps1 / install.py   cross-OS installer
 Makefile · LICENSE (MIT) · CHANGELOG.md · .gitignore
 ```
